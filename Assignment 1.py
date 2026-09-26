@@ -43,7 +43,7 @@ class StripeCardPayment(PaymentMethod):
         self.card_holder = card_holder
 
     def get_details(self) -> message:
-        masked = f"         {self.card_number[-4:]}"
+        masked = f"{self.card_number[-4:]}"
         return f"Stripe Card Payment [{masked}] holder={self.card_holder}"
 
     def pay(self, amount: float) -> bool:
