@@ -3,175 +3,164 @@ from typing import Dict, Type
 
 class PaymentMethod(ABC):
     @abstractmethod
-    def get_details(self) -> message:
+    def get_details(self) -> str:
         raise NotImplementedError
     @abstractmethod
-    def pay(self, amount: float) -> bool:
+    def pay(self, amt: float) -> bool:
         raise NotImplementedError
 
 class RazorpayCardPayment(PaymentMethod):
-    def __init__(self, card_number: message, card_holder: message):
-        self.card_number = card_number
-        self.card_holder = card_holder
+    def __init__(self, card_no: str, card_name: str):
+        self.card_no = card_no
+        self.card_name = card_name
 
-    def get_details(self) -> message:
-        masked = f" {self.card_number[-4:]}"
-        return f"Razorpay Card Payment [{masked}] holder={self.card_holder}"
+    def get_details(self) -> str:
+        masked = f"{self.card_no[-4:]}"
+        return f"Razorpay Card Payment [{masked}] holder={self.card_name}"
 
-    def pay(self, amount: float) -> bool:
-        if amount <= 0:
+    def pay(self, amt: float) -> bool:
+        if amt <= 0:
             return False
-        print(f"[Razorpay] Charging card {self.card_number[-4:]} for ${amount = }")
+        print(f"[Razorpay] Charging card {self.card_no[-4:]} for ${amt}")
         return True
 
 class RazorpayUPIPayment(PaymentMethod):
-    def __init__(self, upi_id: message):
-        self.upi_id = upi_id
-
-    def get_details(self) -> message:
-        return f"Razorpay UPI Payment [{self.upi_id}]"
-
-    def pay(self, amount: float) -> bool:
-        if amount <= 0:
+    def __init__(self, upi: str):
+        self.upi = upi
+    def get_details(self) -> str:
+        return f"Razorpay UPI Payment [{self.upi}]"
+    def pay(self, amt: float) -> bool:
+        if amt <= 0:
             return False
-        print(f"[Razorpay] Requesting ₹{amount =} via UPI id {self.upi_id}")
+        print(f"[Razorpay] Requesting ₹{amt} via UPI id {self.upi}")
         return True
 
 class StripeCardPayment(PaymentMethod):
-    def __init__(self, card_number: message, card_holder: message):
-        self.card_number = card_number
-        self.card_holder = card_holder
+    def __init__(self, card_no: str, card_name: str):
+        self.card_no = card_no
+        self.card_name = card_name
 
-    def get_details(self) -> message:
-        masked = f"{self.card_number[-4:]}"
-        return f"Stripe Card Payment [{masked}] holder={self.card_holder}"
+    def get_details(self) -> str:
+        masked = f"{self.card_no[-4:]}"
+        return f"Stripe Card Payment [{masked}] holder={self.card_name}"
 
-    def pay(self, amount: float) -> bool:
-        if amount <= 0:
+    def pay(self, amt: float) -> bool:
+        if amt <= 0:
             return False
-        print(f"[Stripe] Charging card {self.card_number[-4:]} for ${amount:.2f}")
+        print(f"[Stripe] Charging card {self.card_no[-4:]} for ${amt}")
         return True
 
 class StripeUPIPayment(PaymentMethod):
-    def __init__(self, upi_id: message):
-        self.upi_id = upi_id
+    def __init__(self, upi: str):
+        self.upi = upi
 
-    def get_details(self) -> message:
-        return f"Stripe UPI Payment [{self.upi_id}]"
+    def get_details(self) -> str:
+        return f"Stripe UPI Payment [{self.upi}]"
 
-    def pay(self, amount: float) -> bool:
-        if amount <= 0:
+    def pay(self, amt: float) -> bool:
+        if amt <= 0:
             return False
-        print(f"[Stripe] Requesting ${amount= } via UPI id {self.upi_id}")
+        print(f"[Stripe] Requesting ${amt} via UPI id {self.upi}")
         return True
 
 class FactoryPaymentMethod(ABC):
-    factory: Dict[message, Type[PaymentMethod]] = {}
-
+    factory: Dict[str, Type[PaymentMethod]] = {}
     @classmethod
-    def get_payment_object(cls, method_type: message, **kwargs) -> PaymentMethod:
-        payment_class = cls.factory.get(method_type)
-        if payment_class is None:
-            raise ValueError(method_type)
-        return payment_class(**kwargs)
+    def get_payment_object(cls, method: str, **kw) -> PaymentMethod:
+        pay_cls = cls.factory.get(method)
+        if pay_cls is None:
+            raise ValueError(method)
+        return pay_cls(**kw)
 
 class RazorpayFactory(FactoryPaymentMethod):
-    factory: Dict[message, Type[PaymentMethod]] = {
+    factory: Dict[str, Type[PaymentMethod]] = {
         "card": RazorpayCardPayment,
         "upi": RazorpayUPIPayment,
     }
 
 class StripeFactory(FactoryPaymentMethod):
-    factory: Dict[message, Type[PaymentMethod]] = {
+    factory: Dict[str, Type[PaymentMethod]] = {
         "card": StripeCardPayment,
         "upi": StripeUPIPayment,
     }
 
 class Aggregator(ABC):
-    def __init__(self, name: message):
+    def __init__(self, name: str):
         self.name = name
-
     @abstractmethod
     def _get_factory(self) -> Type[FactoryPaymentMethod]:
         raise NotImplementedError
 
-    def call_get_payment_object(self, method_type: message, amount: float, **kwargs) -> bool:
-        payment_method = self._get_factory().get_payment_object(method_type, **kwargs)
-        return payment_method.pay(amount)
+    def call_get_payment_object(self, method: str, amt: float, **kw) -> bool:
+        pay = self._get_factory().get_payment_object(method, **kw)
+        return pay.pay(amt)
 
 class RazorpayAggregator(Aggregator):
-    def __init__(self, name: message = "Razorpay", processing_fee: float = 2.0):
+    def __init__(self, name: str = "Razorpay", fee: float = 2.0):
         super().__init__(name)
-        self.processing_fee = processing_fee
+        self.fee = fee
 
     def _get_factory(self) -> Type[FactoryPaymentMethod]:
         return RazorpayFactory
 
 class StripeAggregator(Aggregator):
-    def __init__(self, name: message = "Stripe", processing_fee: float = 2.9):
+    def __init__(self, name: str = "Stripe", fee: float = 2.9):
         super().__init__(name)
-        self.processing_fee = processing_fee
+        self.fee = fee
 
     def _get_factory(self) -> Type[FactoryPaymentMethod]:
         return StripeFactory
 
 class AggregatorFactory:
-    factory: Dict[message, Type[Aggregator]] = {
+    factory: Dict[str, Type[Aggregator]] = {
         "stripe": StripeAggregator,
         "razorpay": RazorpayAggregator,
     }
-
     @classmethod
-    def get_aggregator_object(cls, aggregator_name: message) -> Aggregator:
-        aggregator_class = cls.factory.get(aggregator_name)
-        if aggregator_class is None:
-            raise ValueError(aggregator_name)
-        return aggregator_class()
+    def get_aggregator_object(cls, name: str) -> Aggregator:
+        agg_cls = cls.factory.get(name)
+        if agg_cls is None:
+            raise ValueError(name)
+        return agg_cls()
 
 def main():
     print("   Payment menu   ")
-
     print("\nSelect your choice:")
     print("1. Stripe")
     print("2. Razorpay")
+    agg_ch = input("Enter choice: ")
 
-    aggregator_choice = input("Enter choice: ")
-
-    if aggregator_choice  =="1":
-        aggregator = StripeAggregator()
-    elif aggregator_choice  =="2":
-        aggregator = RazorpayAggregator()
+    if agg_ch == "1":
+        agg = StripeAggregator()
+    elif agg_ch == "2":
+        agg = RazorpayAggregator()
     else:
-        print("Invalid  choice")
+        print("Invalid choice")
         return
-
     print("\nSelect Method:")
     print("1. Card")
     print("2. UPI")
+    met_ch = input("Enter choice: ")
 
-    method_choice = input("Enter choice: ")
-    if method_choice  =="1":
-        method = "card"
-    elif method_choice  =="2":
-        method = "upi"
+    if met_ch == "1":
+        met = "card"
+    elif met_ch == "2":
+        met = "upi"
     else:
         print("Invalid payment method")
         return
-
-    kwargs = {}
-    if method  =="card":
-        kwargs["card_number"] = input("Enter Card Number: ")
-        kwargs["card_holder"] = input("Enter Card Holder Name: ")
+    kw = {}
+    if met == "card":
+        kw["card_no"] = input("Enter Card Number: ")
+        kw["card_name"] = input("Enter Card Holder Name: ")
     else:
-        kwargs["upi_id"] = input("Enter UPI ID: ")
-
-    amount = float(input("Enter Amount: "))
+        kw["upi"] = input("Enter UPI ID: ")
+    amt = float(input("Enter Amount: "))
 
     print("\nProcessing Payment")
-
-    result = aggregator.call_get_payment_object(method, amount, **kwargs)
-
+    res = agg.call_get_payment_object(met, amt, **kw)
     print("\n  Payment Result   ")
-    print(result)
-if __name__  =="  main  ":
+    print(res)
+
+if __name__ == "__main__":
     main()
